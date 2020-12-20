@@ -18,8 +18,14 @@ Supplementary materials for the paper: ATTENTION-BASED CROSS-MODAL FUSION FOR AU
 
 <p><div align="center"> 
 <h3> Sample 1 </h3> <img src="after-attention-sample0.PNG"  width=60%/>
+<br>
+
 <h3> Sample 2 </h3> <img src="after-attention-sample1.PNG"  width=60%/>
+<br>
+
 <h3> Sample 3 </h3> <img src="after-attention-sample2.PNG"  width=60%/>
+<br>
+
 <h3> Sample 4 </h3> <img src="after-attention-sample3.PNG"  width=60%/>
 </div>
 </p>
@@ -30,8 +36,12 @@ Supplementary materials for the paper: ATTENTION-BASED CROSS-MODAL FUSION FOR AU
 
 
 <p><div align="center"><h3> Sample 5 </h3> <img src="audio-visual0.PNG" width=50%/></div></p>
-<p><div align="center"><h3> Sample 6 </h3> <img src="audio-visual1.png" width=60%/></div></p>
-<p><div align="center"><h3> Sample 7 </h3> <img src="audio-visual2.png" width=60%/></div></p>
+<br>
+
+<p><div align="center"><h3> Sample 6 </h3> <img src="audio-visual1.PNG" width=50%/></div></p>
+<br>
+
+<p><div align="center"><h3> Sample 7 </h3> <img src="audio-visual2.PNG" width=50%/></div></p>
 
 
 
