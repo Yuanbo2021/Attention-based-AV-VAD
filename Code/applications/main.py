@@ -23,7 +23,7 @@ def main(argv):
         information_type = '_audio'
     elif imageflag:
         information_type = '_video'
-    model_suffix = '_rule_embedded_' + str(regularize_frame_num) + 'frames_b' + str(config.batch) + '_e' + \
+    model_suffix = '_attention_fusion_' + str(regularize_frame_num) + 'frames_b' + str(config.batch) + '_e' + \
                    str(config.epoch) + '_m' + str(model_num) + information_type
 
 
