@@ -246,7 +246,7 @@ def average_pooling(video_close_glu, name):
     return video_close_output
 
 
-def model_rulenet(audio, image, audio_time, audio_freq, video_height, video_width, video_input_frames_num, bi_gru=False):
+def model_framework(audio, image, audio_time, audio_freq, video_height, video_width, video_input_frames_num):
 
     if audio:
         audio_input = Input(shape=(audio_time, audio_freq, 1), name='audio_in')  # (N, 15, 64)
@@ -257,206 +257,147 @@ def model_rulenet(audio, image, audio_time, audio_freq, video_height, video_widt
         audio_p4 = audio_cnn_layer4(audio_p3)
 
         # audio singing
-        audio_singing = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='audio_singing')(audio_p4)
-        audio_singing = layers.BatchNormalization()(audio_singing)
-        audio_singing = layers.ReLU()(audio_singing)  # (None, 15, 4, 16)
-
         rnn_size = 64
-        conv_shape = audio_singing.get_shape()
-        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_singing)
-        if bi_gru:
-            a1_rnn = Bidirectional(GRU(rnn_size, name='audio_singing_rnn'))(a1)  # (None, 128)
-        else:
-            a1_rnn = GRU(rnn_size, name='audio_singing_rnn')(a1)
+        conv_shape = audio_p4.get_shape()
+        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_p4)
+        a1_rnn = GRU(rnn_size, name='audio_singing_rnn')(a1)
         a1_rnnout = layers.BatchNormalization()(a1_rnn)
         a1_rnnout = Activation('linear', name='audio_singing_rnn_linear')(a1_rnnout)
-        if bi_gru:
-            a1_rnnout_gate = Bidirectional(GRU(rnn_size, name='audio_singing_rnn_gate'))(a1)  # (None, 128)
-        else:
-            a1_rnnout_gate = GRU(rnn_size, name='audio_singing_rnn_gate')(a1)
+        a1_rnnout_gate = GRU(rnn_size, name='audio_singing_rnn_gate')(a1)
         a1_rnnout_gate_out = layers.BatchNormalization()(a1_rnnout_gate)
         a1_rnnout_gate_out = Activation('sigmoid', name='audio_singing_rnn_sigmoid')(a1_rnnout_gate_out)
         audio_singing = Multiply()([a1_rnnout, a1_rnnout_gate_out])
 
-        audio_singing_s = Dense(128, name='audio_singing32_s')(audio_singing)  # (N, 128)
+        audio_singing_s = Dense(128, name='audio_singing_embeddings')(audio_singing)  # (N, 128)
         audio_singing_s = layers.BatchNormalization()(audio_singing_s)
-        audio_singing_s = Activation('sigmoid')(audio_singing_s)
-        audio_singing_glu = audio_singing_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
+        audio_singing_embeddings = Activation('sigmoid')(audio_singing_s) # (N, 128) # 这个128维的_embeddings是要用到后面共享融合的
+        audio_singing_output = Dense(1, activation='sigmoid', name='audio_singing_output')(audio_singing_embeddings)
 
-        audio_singing_output = Dense(1, activation='sigmoid', name='audio_singing_output')(audio_singing_glu)
 
         # audio speech
-        audio_speech = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='audio_speech')(audio_p4)
-        audio_speech = layers.BatchNormalization()(audio_speech)
-        audio_speech = layers.ReLU()(audio_speech)  # (None, 15, 4, 16)
-
         rnn_size = 64
-        conv_shape = audio_speech.get_shape()
-        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_speech)
-        if bi_gru:
-            a1_rnn = Bidirectional(GRU(rnn_size, name='audio_speech_rnn'))(a1)  # (None, 128)
-        else:
-            a1_rnn = GRU(rnn_size, name='audio_speech_rnn')(a1)
+        conv_shape = audio_p4.get_shape()
+        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_p4)
+        a1_rnn = GRU(rnn_size, name='audio_speech_rnn')(a1)
         a1_rnnout = layers.BatchNormalization()(a1_rnn)
         a1_rnnout = Activation('linear', name='audio_speech_rnn_linear')(a1_rnnout)
-        if bi_gru:
-            a1_rnnout_gate = Bidirectional(GRU(rnn_size, name='audio_speech_rnn_gate'))(a1)  # (None, 128)
-        else:
-            a1_rnnout_gate = GRU(rnn_size, name='audio_speech_rnn_gate')(a1)
+        a1_rnnout_gate = GRU(rnn_size, name='audio_speech_rnn_gate')(a1)
         a1_rnnout_gate_out = layers.BatchNormalization()(a1_rnnout_gate)
         a1_rnnout_gate_out = Activation('sigmoid', name='audio_speech_rnn_sigmoid')(a1_rnnout_gate_out)
         audio_speech = Multiply()([a1_rnnout, a1_rnnout_gate_out])
 
-        audio_speech_s = Dense(128, name='audio_speech32_s')(audio_speech)  # (N, 128)
+        audio_speech_s = Dense(128, name='audio_speech_embeddings')(audio_speech)  # (N, 128)
         audio_speech_s = layers.BatchNormalization()(audio_speech_s)
-        audio_speech_s = Activation('sigmoid')(audio_speech_s)
-        audio_speech_glu = audio_speech_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
-
-        audio_speech_output = Dense(1, activation='sigmoid', name='audio_speech_output')(audio_speech_glu)
+        audio_speech_embeddings = Activation('sigmoid')(audio_speech_s)  # (N, 128) # 这个128维的_embeddings是要用到后面共享融合的
+        audio_speech_output = Dense(1, activation='sigmoid', name='audio_speech_output')(audio_speech_embeddings)
 
         # audio others
-        audio_others = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='audio_others')(audio_p4)
-        audio_others = layers.BatchNormalization()(audio_others)
-        audio_others = layers.ReLU()(audio_others)  # (None, 15, 4, 16)
-
         rnn_size = 64
-        conv_shape = audio_others.get_shape()
-        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_others)
-        if bi_gru:
-            a1_rnn = Bidirectional(GRU(rnn_size, name='audio_others_rnn'))(a1)  # (None, 128)
-        else:
-            a1_rnn = GRU(rnn_size, name='audio_others_rnn')(a1)
+        conv_shape = audio_p4.get_shape()
+        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_p4)
+        a1_rnn = GRU(rnn_size, name='audio_others_rnn')(a1)
         a1_rnnout = layers.BatchNormalization()(a1_rnn)
         a1_rnnout = Activation('linear', name='audio_others_rnn_linear')(a1_rnnout)
-        if bi_gru:
-            a1_rnnout_gate = Bidirectional(GRU(rnn_size, name='audio_others_rnn_gate'))(a1)  # (None, 128)
-        else:
-            a1_rnnout_gate = GRU(rnn_size, name='audio_others_rnn_gate')(a1)
+        a1_rnnout_gate = GRU(rnn_size, name='audio_others_rnn_gate')(a1)
         a1_rnnout_gate_out = layers.BatchNormalization()(a1_rnnout_gate)
         a1_rnnout_gate_out = Activation('sigmoid', name='audio_others_rnn_sigmoid')(a1_rnnout_gate_out)
         audio_others = Multiply()([a1_rnnout, a1_rnnout_gate_out])
 
-        audio_others_s = Dense(128, name='audio_others32_s')(audio_others)  # (N, 128)
+        audio_others_s = Dense(128, name='audio_others_embeddings')(audio_others)  # (N, 128)
         audio_others_s = layers.BatchNormalization()(audio_others_s)
-        audio_others_s = Activation('sigmoid')(audio_others_s)
-        audio_others_glu = audio_others_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
-
-        audio_others_output = Dense(1, activation='sigmoid', name='audio_others_output')(audio_others_glu)
+        audio_others_embeddings = Activation('sigmoid')(audio_others_s)  # (N, 128) # 这个128维的_embeddings是要用到后面共享融合的
+        audio_others_output = Dense(1, activation='sigmoid', name='audio_others_output')(audio_others_embeddings)
 
         # audio silence
-        audio_silence = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='audio_silence')(audio_p4)
-        audio_silence = layers.BatchNormalization()(audio_silence)
-        audio_silence = layers.ReLU()(audio_silence)  # (None, 15, 4, 16)
-
         rnn_size = 64
-        conv_shape = audio_silence.get_shape()
-        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_silence)
-        if bi_gru:
-            a1_rnn = Bidirectional(GRU(rnn_size, name='audio_silence_rnn'))(a1)  # (None, 128)
-        else:
-            a1_rnn = GRU(rnn_size, name='audio_silence_rnn')(a1)
+        conv_shape = audio_p4.get_shape()
+        a1 = Reshape(target_shape=(int(conv_shape[1]), int(conv_shape[2] * conv_shape[3])))(audio_p4)
+        a1_rnn = GRU(rnn_size, name='audio_silence_rnn')(a1)
         a1_rnnout = layers.BatchNormalization()(a1_rnn)
         a1_rnnout = Activation('linear', name='audio_silence_rnn_linear')(a1_rnnout)
-        if bi_gru:
-            a1_rnnout_gate = Bidirectional(GRU(rnn_size, name='audio_silence_rnn_gate'))(a1)  # (None, 128)
-        else:
-            a1_rnnout_gate = GRU(rnn_size, name='audio_silence_rnn_gate')(a1)
+        a1_rnnout_gate = GRU(rnn_size, name='audio_silence_rnn_gate')(a1)
         a1_rnnout_gate_out = layers.BatchNormalization()(a1_rnnout_gate)
         a1_rnnout_gate_out = Activation('sigmoid', name='audio_silence_rnn_sigmoid')(a1_rnnout_gate_out)
         audio_silence = Multiply()([a1_rnnout, a1_rnnout_gate_out])
 
-        audio_silence_s = Dense(128, name='audio_silence32_s')(audio_silence)  # (N, 128)
+        audio_silence_s = Dense(128, name='audio_silence_embeddings')(audio_silence)  # (N, 128)
         audio_silence_s = layers.BatchNormalization()(audio_silence_s)
-        audio_silence_s = Activation('sigmoid')(audio_silence_s)
-        audio_silence_glu = audio_silence_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
-
-        audio_silence_output = Dense(1, activation='sigmoid', name='audio_silence_output')(audio_silence_glu)
-
+        audio_silence_embeddings = Activation('sigmoid')(audio_silence_s)  # (N, 128) # 这个128维的_embeddings是要用到后面共享融合的
+        audio_silence_output = Dense(1, activation='sigmoid', name='audio_silence_output')(audio_silence_embeddings)
 
     if image:
-        video_input = Input(shape=(video_height, video_width, video_input_frames_num), name='video_in')
+            video_input = Input(shape=(video_height, video_width, video_input_frames_num), name='video_in')
 
-        video_p1 = video_cnn_layer1(video_input)
-        video_p2 = video_cnn_layer2(video_p1)
-        video_p3 = video_cnn_layer3(video_p2)
-        video_p4 = video_cnn_layer4(video_p3)
+            video_p1 = video_cnn_layer1(video_input)
+            video_p2 = video_cnn_layer2(video_p1)
+            video_p3 = video_cnn_layer3(video_p2)
+            video_p4 = video_cnn_layer4(video_p3)
 
-        # video open
-        video_open = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='video_open')(video_p4)
-        video_open = layers.BatchNormalization()(video_open)
-        video_open = layers.ReLU()(video_open)  # (None, 15, 4, 16)
-        video_open = layers.Conv2D(16, (3, 3), strides=(2, 1), padding='same')(video_open)  # (None, 15, 4, 16)
-        video_open = layers.BatchNormalization()(video_open)
-        video_open = layers.ReLU()(video_open)  # (None, 5, 4, 16)
-        video_open = Flatten()(video_open)  # 320
+            # video vocalizing
+            video_vocalization = Flatten()(video_p4)
 
-        video_open_s = Dense(128, name='video_open32_s')(video_open)  # (N, 128)
-        video_open_s = layers.BatchNormalization()(video_open_s)
-        video_open_s = Activation('sigmoid')(video_open_s)
-        video_open_glu = video_open_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
-
-        video_open_output = Dense(1, activation='sigmoid', name='video_open_output')(video_open_glu)
-
-        # video close
-        video_close = layers.Conv2D(16, (1, 1), strides=(1, 1), padding='same', name='video_close')(video_p4)
-        video_close = layers.BatchNormalization()(video_close)
-        video_close = layers.ReLU()(video_close)  # (None, 15, 4, 16)
-        video_close = layers.Conv2D(16, (3, 3), strides=(2, 1), padding='same')(video_close)  # (None, 15, 4, 16)
-        video_close = layers.BatchNormalization()(video_close)
-        video_close = layers.ReLU()(video_close)  # (None, 5, 4, 16)
-        video_close = Flatten()(video_close)  # 320
-
-        video_close_s = Dense(128, name='video_close32_s')(video_close)  # (N, 128)
-        video_close_s = layers.BatchNormalization()(video_close_s)
-        video_close_s = Activation('sigmoid')(video_close_s)
-        video_close_glu = video_close_s  # (N, 128) # 这个128维的glu是要用到后面共享融合的
-
-        video_close_output = Dense(1, activation='sigmoid', name='video_close_output')(video_close_glu)
+            video_vocalization = Dense(128, name='video_vocalization_embeddings')(video_vocalization)  # (N, 128)
+            video_vocalization = layers.BatchNormalization()(video_vocalization)
+            video_vocalization = Activation('sigmoid')(video_vocalization)  # (N, 128) # 这个128维的_embeddings是要用到后面共享融合的
+            video_vocalization_output = Dense(1, activation='sigmoid', name='video_vocalization_output')(video_vocalization)
 
     if audio and image:
-        multiply_singing = Multiply()([audio_singing_glu, video_open_glu])
-        vector_singing = Dense(256, name='vector_singing')(multiply_singing)
-        vector_singing = layers.BatchNormalization()(vector_singing)
-        vector_singing = layers.ReLU()(vector_singing)
-        joint_singing_out = Dense(1, activation='sigmoid', name='joint_singing_out')(vector_singing)
+            audio_matrix = Concatenate()([audio_singing_embeddings, audio_speech_embeddings,
+                                          audio_silence_embeddings, audio_others_embeddings])
+            audio_matrix = Reshape(target_shape=(128, 4))(audio_matrix)
+            shape = audio_matrix.get_shape()
+            print('audio_matrix shape:', shape)
+            # audio_matrix shape: (None, 128, 4)
 
-        multiply_speech = Multiply()([audio_speech_glu, video_open_glu])
-        vector_speech = Dense(256, name='vector_speech')(multiply_speech)
-        vector_speech = layers.BatchNormalization()(vector_speech)
-        vector_speech = layers.ReLU()(vector_speech)
-        joint_speech_out = Dense(1, activation='sigmoid', name='joint_speech_out')(vector_speech)
+            # video_matrix = Reshape(target_shape=(1, 128))(video_close_s_bn)
 
-        multiply_others_1 = Multiply()([audio_others_glu, video_open_glu])
-        multiply_others_2 = Multiply()([audio_others_glu, video_close_glu])
-        multiply_others_3 = Multiply()([audio_singing_glu, video_close_glu])
-        multiply_others_4 = Multiply()([audio_speech_glu, video_close_glu])
-        concat_others = Concatenate()([multiply_others_1, multiply_others_2, multiply_others_3, multiply_others_4])
-        vector_others = Dense(256, name='vector_others')(concat_others)
-        vector_others = layers.BatchNormalization()(vector_others)
-        vector_others = layers.ReLU()(vector_others)
-        joint_others_out = Dense(1, activation='sigmoid', name='joint_others_out')(vector_others)
+            q_dot_k = K.batch_dot(video_glu_concat, audio_matrix)
+            # (N, 128) * (N, 128, 4) = (N, 4)
+            # joint_final_out shape: (None, 4)
+            print('q_dot_k shape:', q_dot_k.get_shape())
+            # joint_final_out shape: (None, 4)
 
-        multiply_silence_1 = Multiply()([audio_silence_glu, video_open_glu])
-        multiply_silence_2 = Multiply()([audio_silence_glu, video_close_glu])
-        concat_silence = Concatenate()([multiply_silence_1, multiply_silence_2])
-        vector_silence = Dense(256, name='vector_silence')(concat_silence)
-        vector_silence = layers.BatchNormalization()(vector_silence)
-        vector_silence = layers.ReLU()(vector_silence)
-        joint_silence_out = Dense(1, activation='sigmoid', name='joint_silence_out')(vector_silence)
+            attention = K.softmax(q_dot_k)
+            print('attention shape:', attention.get_shape())
+            # joint_final_out shape: (None, 4)
 
-    if audio and image:
-        model = Model(inputs=[audio_input, video_input],
-                      outputs=[audio_singing_output, audio_speech_output, audio_silence_output, audio_others_output,
-                               video_open_output, video_close_output,
-                               joint_singing_out, joint_speech_out, joint_silence_out, joint_others_out])
-    elif audio:
-        model = Model(inputs=[audio_input],
-                      outputs=[audio_singing_output, audio_speech_output, audio_silence_output, audio_others_output, ])
+            attention_matrix = K.tile(K.expand_dims(attention, axis=1), (1, 128, 1))
+            print('attention_matrix shape:', attention_matrix.get_shape())
+            # attention_matrix shape: (None, 128, 4)
 
-    model.summary()
+            # audio_matrix_4_128 = K.permute_dimensions(audio_matrix, (0, 2, 1))
+            # print('audio_matrix_4_128 shape:', audio_matrix_4_128.get_shape())
+            # # audio_matrix_4_128 shape: (None, 4, 128)
 
-    if audio and image:
-        joint_independent_compile(model)
-    elif audio:
-        audio_independent_compile(model)
-    return model
+            attention_out = Multiply()([audio_matrix, attention_matrix])
+            print('attention_out shape:', attention_out.get_shape())
+            # attention_out shape: (None, 128, 4)
+
+            singing_attention = Dense(128, name='singing_attention_128')(attention_out[:, :, 0])
+            singing_attention = layers.BatchNormalization()(singing_attention)
+            singing_attention = layers.ReLU()(singing_attention)
+            joint_singing_out = Dense(1, activation='sigmoid', name='joint_singing_out')(singing_attention)
+
+            speech_attention = Dense(128, name='speech_attention_128')(attention_out[:, :, 1])
+            speech_attention = layers.BatchNormalization()(speech_attention)
+            speech_attention = layers.ReLU()(speech_attention)
+            joint_speech_out = Dense(1, activation='sigmoid', name='joint_speech_out')(speech_attention)
+
+            silence_attention = Dense(128, name='silence_attention_128')(attention_out[:, :, 2])
+            silence_attention = layers.BatchNormalization()(silence_attention)
+            silence_attention = layers.ReLU()(silence_attention)
+            joint_silence_out = Dense(1, activation='sigmoid', name='joint_silence_out')(silence_attention)
+
+            others_attention = Dense(128, name='others_attention_128')(attention_out[:, :, 3])
+            others_attention = layers.BatchNormalization()(others_attention)
+            others_attention = layers.ReLU()(others_attention)
+            joint_others_out = Dense(1, activation='sigmoid', name='joint_others_out')(others_attention)
+
+            model = Model(inputs=[audio_input, video_input],
+                          outputs=[audio_singing_output, audio_speech_output,
+                                   audio_silence_output, audio_others_output,
+                                   video_vocalization_output,
+                                   joint_singing_out, joint_speech_out, joint_silence_out, joint_others_out])
+            model.summary()
+            joint_independent_compile_attention(model)
+            return model
