@@ -159,7 +159,7 @@ def train_keras_generator_read_by_each_picture(model_num,
 
     print('model_dir', model_dir)
     if not continue_training:
-        model = model_rulenet(audioflag, imageflag, audio_time, audio_freq, video_height, video_width, video_input_frames_num)
+        model = model_framework(audioflag, imageflag, audio_time, audio_freq, video_height, video_width, video_input_frames_num)
     else:
         model_list = [file for file in os.listdir(model_dir) if file.endswith('.hdf5')]
         max_epoch_num = 0
