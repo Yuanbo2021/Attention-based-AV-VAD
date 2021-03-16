@@ -14,6 +14,7 @@ def main(argv):
     """
     audioflag = 1 # 1 means there is this modal information input during training.
     imageflag = 1 # 1 means there is this modal information input during training.
+    model_num = 1
 
     label_dependent = 0  # 0 means that the outputs of each branch are independent of each other.
 
